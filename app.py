@@ -5,12 +5,12 @@ import os
 from datetime import datetime, timedelta
 
 from config import Config
-from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads # ¡Importante: importar downloads!
+from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads, status, transaction_ref # ¡Importante: importar downloads!
 from flask_mail import Mail, Message
 from flask_login import current_user,login_required, LoginManager, login_user, logout_user
 from sqlalchemy import func, text
 from collections import defaultdict
-
+import traceback  
 import smtplib
 import json 
 import uuid
@@ -223,25 +223,34 @@ def donaciones():
         return redirect(url_for('home_usuario'))
 
     wompi_params_json = ""
+    wompi_error_msg = ""
 
     if request.method == 'POST':
         try:
+            # Depuración: mostrar que llegó la petición POST
+            print(">>> POST /donaciones recibido. form keys:", list(request.form.keys()))
+
+            # Obtén valores del formulario
             creator_id = request.form.get('creator_id')
             game_id = request.form.get('game_id')
             amount_str = request.form.get('amount')
 
             # --- Validación del formulario ---
             if not creator_id or not amount_str:
-                flash('Por favor, selecciona un creador y un monto válido.', 'error')
-                return render_template('donaciones.html', creators=creators, games=games)
+                raise ValueError("Faltan datos: creator_id o amount.")
 
+            # Verificar sesión de usuario
+            if 'user_id' not in session:
+                raise KeyError("Usuario no autenticado (session['user_id'] no existe).")
+
+            # Convertir monto
             amount = float(amount_str)
             if amount < 100:
-                flash('El monto de la donación debe ser al menos 100 COP.', 'error')
-                return render_template('donaciones.html', creators=creators, games=games)
+                raise ValueError("El monto de la donación debe ser al menos 100 COP.")
 
             amount_in_cents = int(amount * 100)
 
+            # Verificar claves de Wompi
             if not WOMPI_PUBLIC_KEY or not WOMPI_INTEGRITY_KEY:
                 raise ValueError("Error de configuración: las claves de Wompi no están definidas.")
 
@@ -259,6 +268,7 @@ def donaciones():
             )
             db.session.add(new_donation)
             db.session.commit()
+            print(f">>> Donación PENDING creada en BD. id: {new_donation.id}, reference: {reference}")
 
             # --- Generar firma para Wompi ---
             chain = f"{reference}{amount_in_cents}{currency}{WOMPI_INTEGRITY_KEY}"
@@ -283,25 +293,41 @@ def donaciones():
             }
 
             wompi_params_json = json.dumps(wompi_params)
+            print(">>> wompi_params_json generado:", wompi_params_json)
 
-            #  IMPORTANTE: Renderizar inmediatamente la plantilla con el JSON
+            # Renderizar plantilla con JSON listo
             return render_template(
                 'donaciones.html',
                 creators=creators,
                 games=games,
-                wompi_params=wompi_params_json
+                wompi_params=wompi_params_json,
+                wompi_error=""
             )
 
         except Exception as e:
-            db.session.rollback()
-            flash(f'Error al iniciar el pago: {e}', 'error')
-            return render_template('donaciones.html', creators=creators, games=games, wompi_params="")
+            # Rollback por seguridad si hubo DB changes
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+            # Mensaje de error legible para front y log en consola con stacktrace
+            wompi_error_msg = str(e)
+            print("❌ Error al iniciar el pago:", wompi_error_msg)
+            traceback.print_exc()
+
+            flash(f'Error al iniciar el pago: {wompi_error_msg}', 'error')
+
+            return render_template(
+                'donaciones.html',
+                creators=creators,
+                games=games,
+                wompi_params="",
+                wompi_error=wompi_error_msg
+            )
 
     # GET (cuando se entra a la página por primera vez)
-    return render_template('donaciones.html', creators=creators, games=games, wompi_params=wompi_params_json)
-
-
-
+    return render_template('donaciones.html', creators=creators, games=games, wompi_params=wompi_params_json, wompi_error="")
 @app.route('/donacion_finalizada')
 
 def donacion_finalizada():
