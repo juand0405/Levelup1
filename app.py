@@ -10,7 +10,7 @@ from flask_mail import Mail, Message
 from flask_login import current_user,login_required, LoginManager, login_user, logout_user
 from sqlalchemy import func, text
 from collections import defaultdict
-from config import Config 
+
 import smtplib
 import json 
 import uuid
