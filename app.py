@@ -3,7 +3,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime, timedelta
-
+from flask_migrate import Migrate
+ 
 from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
@@ -14,8 +15,8 @@ import traceback
 import smtplib
 import json 
 import uuid
-import randomÑ
-Ñ
+import random
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -25,12 +26,13 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db.init_app(app)
 
+migrate = Migrate(app, db)
+
 login_manager = LoginManager()       
 login_manager.init_app(app)         
 login_manager.login_view = 'login'   
 
-from flask_migrate import Migrate
-migrate = Migrate(app, db)
+
 
 @login_manager.user_loader
 def load_user(user_id):
