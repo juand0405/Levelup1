@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 
 from config import Config
-from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads, status, transaction_ref # ¡Importante: importar downloads!
+from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
 from flask_login import current_user,login_required, LoginManager, login_user, logout_user
 from sqlalchemy import func, text
@@ -14,9 +14,8 @@ import traceback
 import smtplib
 import json 
 import uuid
-import random
-import hashlib 
-
+import randomÑ
+Ñ
 app = Flask(__name__)
 app.config.from_object(Config)
 
@@ -29,6 +28,9 @@ db.init_app(app)
 login_manager = LoginManager()       
 login_manager.init_app(app)         
 login_manager.login_view = 'login'   
+
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
 
 @login_manager.user_loader
 def load_user(user_id):
