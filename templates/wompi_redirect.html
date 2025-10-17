@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redireccionando a Wompi...</title>
+    <meta charset="UTF-8">
+</head>
+<body onload="document.getElementById('wompiForm').submit();">
+    
+    <div style="text-align: center; margin-top: 100px;">
+        <h1>Procesando Donación</h1>
+        <p>Estás siendo redirigido a la pasarela de pago segura de Wompi. Por favor, espera un momento...</p>
+    </div>
+    
+    <form id="wompiForm" action="https://checkout.wompi.co/p/" method="GET">
+        
+        <input type="hidden" name="public-key" value="{{ wompi_params.publicKey }}">
+        <input type="hidden" name="currency" value="{{ wompi_params.currency }}">
+        <input type="hidden" name="amount-in-cents" value="{{ wompi_params.amountInCents }}">
+        <input type="hidden" name="reference" value="{{ wompi_params.reference }}">
+        <input type="hidden" name="signature:integrity" value="{{ wompi_params.signature }}">
+        <input type="hidden" name="redirect-url" value="{{ wompi_params.redirectUrl }}">
+        
+        <input type="hidden" name="customer-data:email" value="{{ wompi_params.customerData.email }}">
+        <input type="hidden" name="customer-data:full-name" value="{{ wompi_params.customerData.fullName }}">
+
+        </form>
+
+    <script>
+        // Esta línea asegura que el formulario se envíe automáticamente al cargar la página.
+        document.getElementById('wompiForm').submit();
+    </script>
+</body>
+</html>

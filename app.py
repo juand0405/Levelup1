@@ -16,6 +16,7 @@ import smtplib
 import json 
 import uuid
 import random
+import hashlib
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -83,7 +84,7 @@ with app.app_context():
 def home():
 # ... (Función home completa) ...
     if 'user_id' in session:
-        user = User.query.get(session['user_id'])
+        user = db.session.get(User, session['user_id'])
         if user:
             if user.role == 'Usuario':
               
@@ -286,8 +287,8 @@ def donaciones():
                 'signature': signature,
                 'redirectUrl': WOMPI_REDIRECT_URL,
                 'customerData': {
-                    'email': User.query.get(session['user_id']).email,
-                    'fullName': User.query.get(session['user_id']).username
+                    'email': db.session.get(User, session['user_id']).email,
+                    'fullName': db.session.get(User, session['user_id']).username
                 },
                 'data': {
                     'donor_id': session['user_id'],
@@ -299,22 +300,19 @@ def donaciones():
             wompi_params_json = json.dumps(wompi_params)
             print(">>> wompi_params_json generado:", wompi_params_json)
 
-            # Renderizar plantilla con JSON listo
+            # El 'return' debe estar perfectamente alineado con el 'print' de arriba.
             return render_template(
-                'donaciones.html',
-                creators=creators,
-                games=games,
-                wompi_params=wompi_params_json,
-                wompi_error=""
+                'wompi_redirect.html',
+                wompi_params=wompi_params
             )
-
+            
         except Exception as e:
             # Rollback por seguridad si hubo DB changes
             try:
                 db.session.rollback()
             except Exception:
                 pass
-
+            
             # Mensaje de error legible para front y log en consola con stacktrace
             wompi_error_msg = str(e)
             print("❌ Error al iniciar el pago:", wompi_error_msg)
@@ -322,14 +320,10 @@ def donaciones():
 
             flash(f'Error al iniciar el pago: {wompi_error_msg}', 'error')
 
-            return render_template(
-                'donaciones.html',
-                creators=creators,
-                games=games,
-                wompi_params="",
-                wompi_error=wompi_error_msg
+           return render_template(
+                'wompi_redirect.html', # Usamos el nuevo template para forzar la redirección
+                wompi_params=wompi_params 
             )
-
     # GET (cuando se entra a la página por primera vez)
     return render_template('donaciones.html', creators=creators, games=games, wompi_params=wompi_params_json, wompi_error="")
 @app.route('/donacion_finalizada')
@@ -530,7 +524,7 @@ def home_usuario():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     
     if not user or user.role != 'Usuario':
         flash('No tienes permiso para acceder a esta página.', 'error')
