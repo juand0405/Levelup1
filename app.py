@@ -1,10 +1,11 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from config import WOMPI_PUBLIC_KEY, WOMPI_INTEGRITY_KEY, WOMPI_REDIRECT_URL, WOMPI_CURRENCY
 import os
 from datetime import datetime, timedelta
 from flask_migrate import Migrate
- 
+
 from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
@@ -41,9 +42,11 @@ def load_user(user_id):
     dado el ID almacenado en la sesión."""
     return User.query.get(int(user_id))
 
-WOMPI_PUBLIC_KEY = app.config['WOMPI_PUBLIC_KEY']
-WOMPI_INTEGRITY_KEY = app.config['WOMPI_INTEGRITY_KEY']
-WOMPI_REDIRECT_URL = app.config['WOMPI_REDIRECT_URL']
+    WOMPI_PUBLIC_KEY ='pub_test_4Y1OIFRNcuZnCzZQNacXCjlENsGULG6K'
+    WOMPI_INTEGRITY_KEY ='prv_test_kwlG7RPnh3aJzVGCkTihFNl0mUA6vI3c'
+
+    WOMPI_REDIRECT_URL ='test_events_1IGLUs00g52xQMlcL99WFbPCgk9vAMJN'
+    WOMPI_CURRENCY ='test_integrity_41b4LGhxbAy2L907OytddQGqaC5nXnvp'
 
 def send_notification_email(subject, recipients, html_body):
     """Función de ayuda para enviar un correo electrónico con Flask-Mail."""
@@ -217,52 +220,56 @@ def logout():
     session.pop('user_id', None)
     flash('Has cerrado sesión exitosamente.', 'success')
     return redirect(url_for('login'))
+
+
 # app.py (Ruta /donaciones)
 @app.route('/donaciones', methods=['GET', 'POST'])
 def donaciones():
     try:
+        # --- Cargar datos necesarios para mostrar en la vista ---
         creators = User.query.filter_by(role='Creador').all()
         games = Game.query.all()
     except Exception as e:
-        flash(f'Error al cargar datos necesarios: {e}', 'error')
+        flash(f'Error al cargar datos: {e}', 'error')
         return redirect(url_for('home_usuario'))
-
-    wompi_params_json = ""
-    wompi_error_msg = ""
 
     if request.method == 'POST':
         try:
-            # Depuración: mostrar que llegó la petición POST
-            print(">>> POST /donaciones recibido. form keys:", list(request.form.keys()))
+            print(">>> POST /donaciones recibido.")
 
-            # Obtén valores del formulario
-            creator_id = request.form.get('creator_id')
-            game_id = request.form.get('game_id')
-            amount_str = request.form.get('amount')
+            # 🔹 Forzar lectura de JSON aunque el header sea incorrecto
+            try:
+                data = request.get_json(force=True)
+                print(">>> Datos recibidos (JSON):", data)
+                creator_id = data.get('creator_id')
+                game_id = data.get('game_id')
+                amount_str = data.get('amount')
+            except Exception as e:
+                print("⚠️ No se pudo parsear JSON, intentando con form:", e)
+                creator_id = request.form.get('creator_id')
+                game_id = request.form.get('game_id')
+                amount_str = request.form.get('amount')
 
-            # --- Validación del formulario ---
+            # --- Validaciones ---
             if not creator_id or not amount_str:
-                raise ValueError("Faltan datos: creator_id o amount.")
+                raise ValueError("Faltan datos: creator_id o amount")
 
-            # Verificar sesión de usuario
             if 'user_id' not in session:
-                raise KeyError("Usuario no autenticado (session['user_id'] no existe).")
+                raise KeyError("Usuario no autenticado")
 
-            # Convertir monto
             amount = float(amount_str)
             if amount < 100:
-                raise ValueError("El monto de la donación debe ser al menos 100 COP.")
+                raise ValueError("El monto mínimo de donación es 100 COP")
 
-            amount_in_cents = int(amount * 100)
-
-            # Verificar claves de Wompi
             if not WOMPI_PUBLIC_KEY or not WOMPI_INTEGRITY_KEY:
-                raise ValueError("Error de configuración: las claves de Wompi no están definidas.")
+                raise ValueError("Claves de Wompi no configuradas correctamente")
 
-            currency = 'COP'
-            reference = f'DON-{session["user_id"]}-{creator_id}-{uuid.uuid4().hex[:8]}'
+            # --- Datos de la transacción ---
+            amount_in_cents = int(amount * 100)
+            currency = WOMPI_CURRENCY
+            reference = f"DON-{session['user_id']}-{creator_id}-{uuid.uuid4().hex[:8]}"
 
-            # --- Guardar donación pendiente en BD ---
+            # --- Crear registro de donación PENDING ---
             new_donation = Donation(
                 donor_id=session['user_id'],
                 creator_id=creator_id,
@@ -273,79 +280,73 @@ def donaciones():
             )
             db.session.add(new_donation)
             db.session.commit()
-            print(f">>> Donación PENDING creada en BD. id: {new_donation.id}, reference: {reference}")
+            print(f"✅ Donación creada (PENDING) con ID {new_donation.id}, ref: {reference}")
 
-            # --- Generar firma para Wompi ---
-            chain = f"{reference}{amount_in_cents}{currency}{WOMPI_INTEGRITY_KEY}"
-            signature = hashlib.sha256(chain.encode('utf-8')).hexdigest()
+            # --- Generar firma SHA256 para Wompi ---
+            cadena = f"{reference}{amount_in_cents}{currency}{WOMPI_INTEGRITY_KEY}"
+            signature = hashlib.sha256(cadena.encode('utf-8')).hexdigest()
 
             wompi_params = {
-                'currency': currency,
-                'amountInCents': amount_in_cents,
-                'reference': reference,
-                'publicKey': WOMPI_PUBLIC_KEY,
-                'signature': signature,
-                'redirectUrl': WOMPI_REDIRECT_URL,
-                'customerData': {
-                    'email': db.session.get(User, session['user_id']).email,
-                    'fullName': db.session.get(User, session['user_id']).username
+                "currency": currency,
+                "amountInCents": amount_in_cents,
+                "reference": reference,
+                "publicKey": WOMPI_PUBLIC_KEY,
+                "signature": signature,
+                "redirectUrl": WOMPI_REDIRECT_URL,
+                "customerData": {
+                    "email": db.session.get(User, session['user_id']).email,
+                    "fullName": db.session.get(User, session['user_id']).username
                 },
-                'data': {
-                    'donor_id': session['user_id'],
-                    'creator_id': creator_id,
-                    'game_id': game_id
+                "data": {
+                    "donor_id": session['user_id'],
+                    "creator_id": creator_id,
+                    "game_id": game_id
                 }
             }
 
-            wompi_params_json = json.dumps(wompi_params)
-            print(">>> wompi_params_json generado:", wompi_params_json)
+            print(">>> wompi_params_json generado:", wompi_params)
 
-            # El 'return' debe estar perfectamente alineado con el 'print' de arriba.
-            return render_template(
-                'wompi_redirect.html',
-                wompi_params=wompi_params
-            )
-            
+            # --- Si fue petición JSON (fetch desde JS) ---
+            if request.is_json or request.headers.get("Content-Type") == "application/json":
+                return jsonify({"success": True, "wompi": wompi_params}), 200
+
+            # --- Si fue formulario HTML normal ---
+            return render_template("wompi_redirect.html", wompi_params=wompi_params)
+
         except Exception as e:
-            # Rollback por seguridad si hubo DB changes
-            try:
-                db.session.rollback()
-            except Exception:
-                pass
-            
-            # Mensaje de error legible para front y log en consola con stacktrace
-            wompi_error_msg = str(e)
-            print("❌ Error al iniciar el pago:", wompi_error_msg)
+            db.session.rollback()
+            print("❌ Error en /donaciones:", e)
             traceback.print_exc()
 
-            flash(f'Error al iniciar el pago: {wompi_error_msg}', 'error')
+            if request.is_json:
+                return jsonify({"success": False, "error": str(e)}), 400
 
-           return render_template(
-                'wompi_redirect.html', # Usamos el nuevo template para forzar la redirección
-                wompi_params=wompi_params 
-            )
-    # GET (cuando se entra a la página por primera vez)
-    return render_template('donaciones.html', creators=creators, games=games, wompi_params=wompi_params_json, wompi_error="")
+            flash(f"Error al iniciar el pago: {e}", "error")
+            return render_template("wompi_redirect.html", wompi_params={})
+
+    # --- GET: mostrar formulario ---
+    return render_template(
+        "donaciones.html",
+        creators=creators,
+        games=games
+    )
+
+
+
 @app.route('/donacion_finalizada')
-
 def donacion_finalizada():
-    # Wompi añade el parámetro 'status' y 'id' a la URL
-    status = request.args.get('status')
-    transaction_id = request.args.get('id')
+    status = request.args.get('status', 'ERROR')
+    transaction_id = request.args.get('id', 'N/A')
 
     if status == 'APPROVED':
-        # La lógica de actualizar la DB a 'APPROVED' DEBE estar en el Webhook (ver nota abajo), 
-        # pero aquí mostramos el éxito.
-        flash('¡🎉 Donación Exitosa! Gracias por tu apoyo. Tu aporte ha sido procesado.', 'success')
-        return redirect(url_for('home_usuario')) 
-        
+        flash('🎉 ¡Donación Exitosa! Gracias por tu apoyo.', 'success')
     elif status == 'PENDING':
-        flash('Tu pago está en estado pendiente. Recibirás una notificación cuando se apruebe.', 'warning')
-        return redirect(url_for('home_usuario'))
-        
-    else: # DECLINED, ERROR, etc.
-        flash('❌ La donación no pudo ser completada. Por favor, revisa tus datos de pago.', 'error')
-        return redirect(url_for('donaciones'))
+        flash('⌛ Tu pago está en estado pendiente. Recibirás una notificación cuando se apruebe.', 'warning')
+    else:
+        flash('❌ La donación no pudo completarse o fue cancelada.', 'error')
+
+    return render_template('wompi_return.html', status=status, transaction_id=transaction_id)
+
 @app.route('/wompi_events', methods=['POST'])
 def wompi_events():
     event = request.get_json()
@@ -393,6 +394,13 @@ def wompi_events_redirect():
     flash('Tu pago fue procesado. Revisa el estado en tu historial.', 'info')
     return redirect(url_for('home_user')) # O a donde quieras que el usuario vaya
 @app.route('/create-payment-preference', methods=['POST'])
+
+@app.route('/wompi_redirect')
+def wompi_redirect():
+    status = request.args.get('status', 'ERROR')
+    transaction_id = request.args.get('id', 'N/A')
+    return render_template('wompi_return.html', status=status, transaction_id=transaction_id)
+
 
 def create_payment_preference():
     """

@@ -1,130 +1,96 @@
-{% extends "base.html" %}
-{% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Donaciones</title>
+    <script src="https://checkout.wompi.co/widget.js"></script>
+</head>
+<body>
+    <h1>Haz una donación</h1>
 
-<style>
-.form-container {
-    max-width: 500px;
-    margin: 50px auto;
-    background: #fff;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-h2 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #333;
-}
-.btn {
-    width: 48%;
-    display: inline-block;
-    text-align: center;
-}
-</style>
+    <label>Creador:</label>
+    <select id="creator_id">
+        {% for c in creators %}
+        <option value="{{ c.id }}">{{ c.username }}</option>
+        {% endfor %}
+    </select>
 
-<div class="form-container">
-    <h2>💖 Realizar Donación -------------------</h2>
+    <label>Juego (opcional):</label>
+    <select id="game_id">
+        <option value="">-- Ninguno --</option>
+        {% for g in games %}
+        <option value="{{ g.id }}">{{ g.name }}</option>
+        {% endfor %}
+    </select>
 
-    <form id="donationForm">
-        <!-- Selección de creador -->
-        <div class="form-group">
-            <label for="creator_id">Donar a Creador:</label>
-            <select id="creator_id" name="creator_id" class="form-control" required>
-                <option value="">Selecciona un creador</option>
-                {% for creator in creators %}
-                    <option value="{{ creator.id }}">{{ creator.username }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    <label>Monto (COP):</label>
+    <input type="number" id="amount" min="100" step="100" />
 
-        <!-- Selección de juego -->
-        <div class="form-group">
-            <label for="game_id">Donar por Juego (opcional):</label>
-            <select id="game_id" name="game_id" class="form-control">
-                <option value="">Ninguno</option>
-                {% for game in games %}
-                    <option value="{{ game.id }}">{{ game.name }} (de {{ game.creator.username }})</option>
-                {% endfor %}
-            </select>
-            <small>Si seleccionas un juego, la donación se dirigirá automáticamente a su creador.</small>
-        </div>
-
-        <!-- Monto -->
-        <div class="form-group">
-            <label for="amount">Monto de la Donación (COP):</label>
-            <input type="number" id="amount" name="amount" step="100" min="100" class="form-control" required>
-        </div>
-
-        <div style="display:flex; justify-content:space-between;">
-            <button type="button" id="payButton" class="btn btn-primary">Pagar y Donar</button>
-            <a href="{{ url_for('home_usuario') }}" class="btn btn-secondary">Cancelar</a>
-        </div>
-    </form>
-</div>
-
-<!-- Script oficial de Wompi -->
-<script type="text/javascript" src="https://checkout.wompi.co/widget.js"></script>
-
+    <button id="payButton">Donar con Wompi</button>
 <script>
 document.getElementById('payButton').addEventListener('click', async function() {
     const creator_id = document.getElementById('creator_id').value;
     const game_id = document.getElementById('game_id').value;
     const amount = document.getElementById('amount').value;
 
-    if (!creator_id || !amount || amount < 100) {
-        alert("Por favor selecciona un creador y un monto válido (mínimo 100 COP).");
+    if (!amount || amount < 100) {
+        alert("Monto mínimo: 100 COP");
         return;
     }
 
     try {
-        // Enviar datos al backend (Flask)
-        const response = await fetch("/donaciones", {
+        const resp = await fetch("/donaciones", {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ creator_id, game_id, amount })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creator_id, game_id, amount })
         });
 
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        const wompiDataScript = doc.querySelector("#wompi-data");
-
-        if (!wompiDataScript) {
-            alert("Error al generar la transacción de pago.");
+        // Si el servidor devuelve error 500 o similar
+        if (!resp.ok) {
+            const text = await resp.text();
+            console.error("Error en respuesta del servidor:", text);
+            alert("Error al procesar la donación (HTTP " + resp.status + ")");
             return;
         }
 
-        const wompiData = JSON.parse(wompiDataScript.textContent);
+        // Intentar parsear JSON
+        let data;
+        try {
+            data = await resp.json();
+        } catch (parseError) {
+            console.error("Respuesta no es JSON:", parseError);
+            alert("Error al leer respuesta del servidor");
+            return;
+        }
 
-        // Inicia el widget de pago de Wompi
+        if (!data.success) {
+            alert("Error del servidor: " + (data.error || "Error desconocido"));
+            return;
+        }
+
+        const wompi = data.wompi;
+        console.log("✅ Wompi params recibidos:", wompi);
+
         const checkout = new WidgetCheckout({
-            currency: wompiData.currency,
-            amountInCents: wompiData.amountInCents,
-            reference: wompiData.reference,
-            publicKey: wompiData.publicKey,
-            signature: wompiData.signature,
-            redirectUrl: wompiData.redirectUrl,
-            customerData: wompiData.customerData || {}
+            currency: wompi.currency,
+            amountInCents: wompi.amountInCents,
+            reference: wompi.reference,
+            publicKey: wompi.publicKey,
+            redirectUrl: wompi.redirectUrl,
+            customerData: wompi.customerData
         });
 
-        checkout.open(function (result) {
-            console.log("Resultado del pago:", result);
-            // Limpia el historial para evitar abrir el widget dos veces
-            window.history.replaceState({}, document.title, window.location.pathname);
+        checkout.open((result) => {
+            console.log("Resultado del widget:", result);
+            window.location.href = wompi.redirectUrl;
         });
 
-    } catch (error) {
-        console.error("Error al iniciar pago:", error);
-        alert("Ocurrió un error al procesar la donación. Intenta de nuevo.");
+    } catch (err) {
+        console.error("❌ Error de conexión:", err);
+        alert("Error de conexión con el servidor");
     }
 });
 </script>
 
-{% if wompi_params %}
-<script id="wompi-data" type="application/json">
-    {{ wompi_params | safe }}
-</script>
-{% endif %}
-
-{% endblock %}
+</body>
+</html>
