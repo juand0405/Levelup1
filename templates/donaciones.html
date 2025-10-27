@@ -72,12 +72,17 @@ document.getElementById('payButton').addEventListener('click', async function() 
         console.log("✅ Wompi params recibidos:", wompi);
 
         const checkout = new WidgetCheckout({
-            currency: wompi.currency,
-            amountInCents: wompi.amountInCents,
-            reference: wompi.reference,
-            publicKey: wompi.publicKey,
-            redirectUrl: wompi.redirectUrl,
-            customerData: wompi.customerData
+        currency: wompi.currency,
+        amountInCents: wompi.amountInCents,
+        reference: wompi.reference,
+        publicKey: wompi.publicKey,
+        redirectUrl: wompi.redirectUrl,
+        customerData: wompi.customerData,
+
+        // ✅ Agregar firma obligatoria:
+        signature: {
+            integrity: wompi.signature
+        }
         });
 
         checkout.open((result) => {

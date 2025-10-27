@@ -42,12 +42,10 @@ def load_user(user_id):
     dado el ID almacenado en la sesión."""
     return User.query.get(int(user_id))
 
-    WOMPI_PUBLIC_KEY ='pub_test_4Y1OIFRNcuZnCzZQNacXCjlENsGULG6K'
-    WOMPI_INTEGRITY_KEY ='prv_test_kwlG7RPnh3aJzVGCkTihFNl0mUA6vI3c'
-
-    WOMPI_REDIRECT_URL ='test_events_1IGLUs00g52xQMlcL99WFbPCgk9vAMJN'
-    WOMPI_CURRENCY ='test_integrity_41b4LGhxbAy2L907OytddQGqaC5nXnvp'
-
+WOMPI_PUBLIC_KEY = 'pub_prod_rsFWKqoo2nBPc1ywo92AufU32xCP9Vaf'
+WOMPI_INTEGRITY_KEY = 'prv_prod_Wyki3bEfGsCbWSdXDmTO3TNQkeok31hU'
+WOMPI_REDIRECT_URL = 'https://levelup.isladigital.xyz/donacion_finalizada'
+WOMPI_CURRENCY = 'COP'
 def send_notification_email(subject, recipients, html_body):
     """Función de ayuda para enviar un correo electrónico con Flask-Mail."""
     try:
@@ -291,7 +289,9 @@ def donaciones():
                 "amountInCents": amount_in_cents,
                 "reference": reference,
                 "publicKey": WOMPI_PUBLIC_KEY,
-                "signature": signature,
+                "signature": {
+                    "integrity": signature
+                },
                 "redirectUrl": WOMPI_REDIRECT_URL,
                 "customerData": {
                     "email": db.session.get(User, session['user_id']).email,
