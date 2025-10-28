@@ -9,12 +9,12 @@ from flask_migrate import Migrate
 from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
-from flask_login import current_user,login_required, LoginManager, login_user, logout_user
+from flask_login import  login_required, LoginManager, login_user, current_user
 from sqlalchemy import func, text
 from collections import defaultdict
 import traceback  
 import smtplib
-import json 
+import json
 import uuid
 import random
 import hashlib
@@ -46,6 +46,7 @@ WOMPI_PUBLIC_KEY = 'pub_prod_rsFWKqoo2nBPc1ywo92AufU32xCP9Vaf'
 WOMPI_INTEGRITY_KEY = 'prv_prod_Wyki3bEfGsCbWSdXDmTO3TNQkeok31hU'
 WOMPI_REDIRECT_URL = 'https://levelup.isladigital.xyz/donacion_finalizada'
 WOMPI_CURRENCY = 'COP'
+
 def send_notification_email(subject, recipients, html_body):
     """Función de ayuda para enviar un correo electrónico con Flask-Mail."""
     try:
@@ -192,23 +193,24 @@ def publicar_avance():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-# ... (Función login completa) ...
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         
         user = User.query.filter_by(username=username).first()
-        
+
         if user and check_password_hash(user.password, password):
-            session['user_id'] = user.id
-            if user.role == 'Usuario':
-                return redirect(url_for('home_usuario'))
-            elif user.role == 'Creador':
+            login_user(user)  # ✅ ESTA ES LA LÍNEA IMPORTANTE
+            print("ROL:", repr(user.role))  # TEMPORAL PARA VERIFICAR
+
+            if user.role.strip().lower() == 'creador':
                 return redirect(url_for('home_creador'))
-            elif user.role == 'Administrador':
+            elif user.role.strip().lower() == 'administrador':
                 return redirect(url_for('admin_panel'))
-        else:
-            flash('Usuario o contraseña incorrectos.', 'error')
+            else:
+                return redirect(url_for('home_usuario'))
+
+        flash('Usuario o contraseña incorrectos.', 'error')
             
     return render_template('login.html')
 
@@ -220,7 +222,27 @@ def logout():
     return redirect(url_for('login'))
 
 
-# app.py (Ruta /donaciones)
+@app.route('/delete_notification/<int:notif_id>', methods=['POST'])
+def delete_notification(notif_id):
+    notif = Notification.query.get_or_404(notif_id)
+
+    # Solo creador o admin pueden borrar
+    if notif.creator_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        abort(403)
+
+    # Eliminar imagen si existe
+    if notif.image_url:
+        image_path = os.path.join(app.root_path, 'static/uploads', notif.image_url)
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+    db.session.delete(notif)
+    db.session.commit()
+
+    return redirect(url_for('home_usuario'))
+
+
+
 @app.route('/donaciones', methods=['GET', 'POST'])
 def donaciones():
     try:
@@ -289,9 +311,7 @@ def donaciones():
                 "amountInCents": amount_in_cents,
                 "reference": reference,
                 "publicKey": WOMPI_PUBLIC_KEY,
-                "signature": {
-                    "integrity": signature
-                },
+                "signature": signature,
                 "redirectUrl": WOMPI_REDIRECT_URL,
                 "customerData": {
                     "email": db.session.get(User, session['user_id']).email,
@@ -544,29 +564,27 @@ def home_usuario():
     
     return render_template('homeUser.html', user=user, all_games=games_uploaded, downloaded_games=downloaded_games, notifications=latest_notifications)
 
+
 @app.route('/home_creador')
-
+@login_required
 def home_creador():
-    if current_user.role != 'Creador':
+    if current_user.role.strip().lower() != 'creador':
         flash('Acceso denegado.', 'error')
-        return redirect(url_for('home_usuario'))
+        return redirect(url_for('home_usuario'))  # ✅ ADIÓS LOOP INFINITO
 
-    # Esta línea ahora funcionará después de la migración de la DB
     received_donations = current_user.received_donations
-    
-    # Agrupar donaciones para el dashboard
+
     donations_by_game = defaultdict(float)
     total_received = 0.0
     for donation in received_donations:
-        # Aseguramos que la donación esté APROBADA o COMPLETA si tienes esa lógica, 
-        # pero para el total usamos todas por ahora:
         game_name = donation.game.name if donation.game else "General"
         donations_by_game[game_name] += donation.amount
         total_received += donation.amount
 
-    # Lógica para otras vistas 
     my_games = current_user.creator_games
-    notifications = Notification.query.filter_by(creator_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    notifications = Notification.query.filter_by(
+        creator_id=current_user.id
+    ).order_by(Notification.created_at.desc()).all()
 
     return render_template(
         'homeCreador.html', 
@@ -574,9 +592,9 @@ def home_creador():
         received_donations=received_donations,
         donations_by_game=dict(donations_by_game),
         total_received=total_received,
-          my_games=my_games,
+        my_games=my_games,
         notifications=notifications
-    )   
+    )  
 
 @app.route('/admin_panel')
 def admin_panel():
@@ -862,5 +880,4 @@ def reset_password_code(token):
     return render_template('reset_password.html', token=token)
 
 if __name__ == '__main__':
-    # El db.create_all() ya no es necesario aquí si se usa el contexto de aplicación arriba
     app.run(debug=True, host="0.0.0.0", port=5000)
