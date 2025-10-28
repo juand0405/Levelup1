@@ -11,6 +11,15 @@ downloads = db.Table(
     db.Column('game_id', db.Integer, db.ForeignKey('game.id'), primary_key=True)
 )
 
+class LoginLog(db.Model):
+    __tablename__ = 'login_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relación opcional para acceder al usuario desde el log
+    user = db.relationship('User', backref=db.backref('login_logs', lazy=True))
+
 
 class User(db.Model, UserMixin):
     __tablename__ = 'user'

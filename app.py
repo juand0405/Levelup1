@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify, Blueprint
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from config import WOMPI_PUBLIC_KEY, WOMPI_INTEGRITY_KEY, WOMPI_REDIRECT_URL, WOMPI_CURRENCY
@@ -10,7 +10,7 @@ from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
 from flask_login import  login_required, LoginManager, login_user, current_user
-from sqlalchemy import func, text
+from sqlalchemy import func, text, extract
 from collections import defaultdict
 import traceback  
 import smtplib
@@ -27,7 +27,7 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 db.init_app(app)
-
+admin_bp = Blueprint('admin', __name__)
 migrate = Migrate(app, db)
 
 login_manager = LoginManager()       
@@ -194,29 +194,40 @@ def publicar_avance():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
         
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter(func.lower(User.username) == username.lower()).first()
 
         if user and check_password_hash(user.password, password):
-            login_user(user)  # ✅ ESTA ES LA LÍNEA IMPORTANTE
-            print("ROL:", repr(user.role))  # TEMPORAL PARA VERIFICAR
+            # Guarda la sesión correctamente
+            login_user(user)
+            session['user_id'] = user.id  # ✅ Importante para mantener la sesión activa
+            session['role'] = user.role.strip().lower()
 
-            if user.role.strip().lower() == 'creador':
-                return redirect(url_for('home_creador'))
-            elif user.role.strip().lower() == 'administrador':
+            # Limpia posibles espacios o mayúsculas
+            role = user.role.strip().lower()
+            print(f"Usuario {user.username} ha iniciado sesión como {role}")
+
+            # Redirección según el rol
+            if role == 'administrador':
+                flash('Inicio de sesión exitoso como Administrador.', 'success')
                 return redirect(url_for('admin_panel'))
+            elif role == 'creador':
+                flash('Inicio de sesión exitoso como Creador.', 'success')
+                return redirect(url_for('home_creador'))
             else:
+                flash('Inicio de sesión exitoso como Usuario.', 'success')
                 return redirect(url_for('home_usuario'))
+        else:
+            flash('Usuario o contraseña incorrectos.', 'error')
 
-        flash('Usuario o contraseña incorrectos.', 'error')
-            
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
-# ... (Función logout completa) ...
+    """Cierra la sesión actual y redirige al login."""
     session.pop('user_id', None)
     flash('Has cerrado sesión exitosamente.', 'success')
     return redirect(url_for('login'))
@@ -548,11 +559,12 @@ def donation_history():
 @app.route('/home_usuario')
 
 def home_usuario():
-# ... (Función home_usuario completa) ...
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
-    user = db.session.get(User, session['user_id'])
+
+    if current_user.role != 'Usuario':
+        flash('No tienes permiso para acceder a esta página.', 'error')
+        return redirect(url_for('home'))
+
+    user = current_user
     
     if not user or user.role != 'Usuario':
         flash('No tienes permiso para acceder a esta página.', 'error')
@@ -615,66 +627,117 @@ def admin_panel():
     
     return render_template('admin_dashboard.html', users=users, games=games, donations=donations)
 
-@app.route('/admin/dashboard/data', methods=['GET'])
+
+
+@admin_bp.route('/admin/dashboard/data')
 def dashboard_data():
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    user_session = User.query.get(session['user_id'])
-    if not user_session or user_session.role != 'Administrador':
-        return jsonify({'error': 'Acceso denegado'}), 403
+    """Genera los datos estadísticos del panel de administración."""
+    # --- Donaciones por mes ---
+    donations_month = (
+        db.session.query(
+            extract('month', Donation.timestamp).label('month'),
+            func.sum(Donation.amount)
+        )
+        .group_by('month')
+        .order_by('month')
+        .all()
+    )
+    donations_month_labels = [str(int(row[0])) for row in donations_month]
+    donations_month_data = [float(row[1]) for row in donations_month]
 
-    donations_data_month = db.session.query(
-        func.DATE_FORMAT(Donation.timestamp, '%Y-%m').label('month'), 
-        func.sum(Donation.amount).label('total_donated')
-    ).group_by('month').order_by('month').all()
+    # --- Donaciones por semana ---
+    donations_week = (
+        db.session.query(
+            func.strftime('%Y-%W', Donation.timestamp).label('week'),
+            func.sum(Donation.amount)
+        )
+        .group_by('week')
+        .order_by('week')
+        .all()
+    )
+    donations_week_labels = [row[0] for row in donations_week]
+    donations_week_data = [float(row[1]) for row in donations_week]
 
-    donations_labels_month = [row.month for row in donations_data_month]
-    donations_values_month = [float(row.total_donated) if row.total_donated else 0 for row in donations_data_month] 
-    
-    donations_data_week = db.session.query(
-        func.concat(func.YEAR(Donation.timestamp), '-', func.WEEKOFYEAR(Donation.timestamp)).label('week'),
-        func.sum(Donation.amount).label('total_donated')
-    ).group_by('week').order_by('week').limit(8).all()
+    # --- Conteo de usuarios por rol ---
+    logins_by_role = (
+        db.session.query(User.role, func.count(User.id))
+        .group_by(User.role)
+        .all()
+    )
+    logins_labels = [row[0] for row in logins_by_role]
+    logins_data = [row[1] for row in logins_by_role]
 
-    donations_labels_week = [row.week for row in donations_data_week]
-    donations_values_week = [float(row.total_donated) if row.total_donated else 0 for row in donations_data_week]
+    # --- Top 10 juegos más descargados ---
+    downloads_count = (
+        db.session.query(
+            Game.name,
+            func.count(downloads.c.game_id).label('count')
+        )
+        .join(downloads, Game.id == downloads.c.game_id)
+        .group_by(Game.id)
+        .order_by(func.count(downloads.c.game_id).desc())
+        .limit(10)
+        .all()
+    )
+    downloads_labels = [row[0] for row in downloads_count]
+    downloads_data = [row[1] for row in downloads_count]
 
-    # --- 3. Datos de Conteo de Usuarios por Rol (Gráfica de Dona) (EXISTENTE) ---
-    user_counts = db.session.query(User.role, func.count(User.id)).group_by(User.role).all()
-    
-    login_labels = [role for role, count in user_counts]
-    login_values = [count for role, count in user_counts]
-    
-    # --- 4. Datos de Cantidad de Descargas por Juego (¡NUEVO!) ---
-    # Usa la tabla de asociación 'downloads'
-    downloads_data = db.session.query(
-        Game.name, 
-        func.count(downloads.c.user_id).label('download_count')
-    ).join(downloads).group_by(Game.id, Game.name).order_by(func.count(downloads.c.user_id).desc()).limit(10).all()
+    # --- Actividad diaria del mes actual ---
+    today = datetime.utcnow()
+    start_of_month = today.replace(day=1)
+    next_month = (start_of_month + timedelta(days=32)).replace(day=1)
 
-    downloads_labels = [row.name for row in downloads_data]
-    downloads_values = [row.download_count for row in downloads_data]
+    # --- Donaciones por día ---
+    donations_daily = (
+        db.session.query(
+            func.date(Donation.timestamp).label('date'),
+            func.sum(Donation.amount).label('total')
+        )
+        .filter(Donation.timestamp >= start_of_month, Donation.timestamp < next_month)
+        .group_by('date')
+        .order_by('date')
+        .all()
+    )
+    donation_daily_dict = {str(row.date): float(row.total or 0) for row in donations_daily}
 
+    # --- Descargas por día ---
+    downloads_daily = []
+    try:
+        downloads_daily = db.session.execute(text("""
+            SELECT DATE(timestamp) AS date, COUNT(*) AS total
+            FROM downloads
+            WHERE timestamp >= :start AND timestamp < :end
+            GROUP BY DATE(timestamp)
+            ORDER BY DATE(timestamp)
+        """), {'start': start_of_month, 'end': next_month}).fetchall()
+    except Exception as e:
+        print("⚠️ No se encontró columna timestamp en downloads:", e)
+    downloads_daily_dict = {str(row.date): row.total for row in downloads_daily}
+
+    # --- Logins por día (vacío si no tienes tabla LoginLog) ---
+    logins_daily_dict = {}
+
+    # --- Etiquetas del mes actual ---
+    days_in_month = [(start_of_month + timedelta(days=i)).date() for i in range((next_month - start_of_month).days)]
+    labels_daily = [str(day) for day in days_in_month]
+
+    # --- Preparar datos combinados ---
+    activity_day = {
+        'labels': labels_daily,
+        'donations': [donation_daily_dict.get(str(day), 0) for day in days_in_month],
+        'downloads': [downloads_daily_dict.get(str(day), 0) for day in days_in_month],
+        'logins': [logins_daily_dict.get(str(day), 0) for day in days_in_month],
+    }
+
+    # --- Enviar datos a frontend ---
     return jsonify({
-        'donations_month': {
-            'labels': donations_labels_month,
-            'data': donations_values_month
-        },
-        'donations_week': {
-            'labels': donations_labels_week,
-            'data': donations_values_week
-        },
-        'logins': {
-            'labels': login_labels,
-            'data': login_values
-        },
-        'downloads': {
-            'labels': downloads_labels,
-            'data': downloads_values
-        }
+        'donations_month': {'labels': donations_month_labels, 'data': donations_month_data},
+        'donations_week': {'labels': donations_week_labels, 'data': donations_week_data},
+        'logins': {'labels': logins_labels, 'data': logins_data},
+        'downloads': {'labels': downloads_labels, 'data': downloads_data},
+        'activity_day': activity_day
     })
-    
+
 def insert_data():
 # ... (Función insert_data completa) ...
     with app.app_context():
