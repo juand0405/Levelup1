@@ -5,7 +5,7 @@ from config import WOMPI_PUBLIC_KEY, WOMPI_INTEGRITY_KEY, WOMPI_REDIRECT_URL, WO
 import os
 from datetime import datetime, timedelta
 from flask_migrate import Migrate
-
+from datetime import datetime
 from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
@@ -26,15 +26,16 @@ mail = Mail(app)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
+
 db.init_app(app)
 admin_bp = Blueprint('admin', __name__)
 migrate = Migrate(app, db)
 
 login_manager = LoginManager()       
 login_manager.init_app(app)         
-login_manager.login_view = 'login'   
+login_manager.login_view = 'login'
 
-
+# ✅ REGISTRAR BLUEPRINT DEL ADMINISTRADOR (necesario para las gráficas)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -42,10 +43,10 @@ def load_user(user_id):
     dado el ID almacenado en la sesión."""
     return User.query.get(int(user_id))
 
-WOMPI_PUBLIC_KEY = 'pub_prod_rsFWKqoo2nBPc1ywo92AufU32xCP9Vaf'
-WOMPI_INTEGRITY_KEY = 'prv_prod_Wyki3bEfGsCbWSdXDmTO3TNQkeok31hU'
-WOMPI_REDIRECT_URL = 'https://levelup.isladigital.xyz/donacion_finalizada'
-WOMPI_CURRENCY = 'COP'
+    WOMPI_PUBLIC_KEY = 'pub_prod_rsFWKqoo2nBPc1ywo92AufU32xCP9Vaf'
+    WOMPI_INTEGRITY_KEY = 'prv_prod_Wyki3bEfGsCbWSdXDmTO3TNQkeok31hU'
+    WOMPI_REDIRECT_URL = 'https://levelup.isladigital.xyz/donacion_finalizada'
+    WOMPI_CURRENCY = 'COP'
 
 def send_notification_email(subject, recipients, html_body):
     """Función de ayuda para enviar un correo electrónico con Flask-Mail."""
@@ -56,7 +57,7 @@ def send_notification_email(subject, recipients, html_body):
                       recipients=recipients,
                       html=html_body)
         # Envía el correo
-        mail.send(msg) #
+        mail.send(msg) 
         return True
     except Exception as e:
         print(f"Error al enviar correo: {e}")
@@ -627,8 +628,6 @@ def admin_panel():
     
     return render_template('admin_dashboard.html', users=users, games=games, donations=donations)
 
-
-
 @admin_bp.route('/admin/dashboard/data')
 def dashboard_data():
     """Genera los datos estadísticos del panel de administración."""
@@ -647,18 +646,16 @@ def dashboard_data():
 
     # --- Donaciones por semana ---
     donations_week = (
-        db.session.query(
-            func.strftime('%Y-%W', Donation.timestamp).label('week'),
-            func.sum(Donation.amount)
+    db.session.query(
+        func.date_format(Donation.timestamp, '%Y-%u').label('week'),  # <-- cambiado
+        func.sum(Donation.amount)
+            )
+            .group_by('week')
+            .order_by('week')
+            .all()
         )
-        .group_by('week')
-        .order_by('week')
-        .all()
-    )
     donations_week_labels = [row[0] for row in donations_week]
     donations_week_data = [float(row[1]) for row in donations_week]
-
-    # --- Conteo de usuarios por rol ---
     logins_by_role = (
         db.session.query(User.role, func.count(User.id))
         .group_by(User.role)
@@ -687,7 +684,6 @@ def dashboard_data():
     start_of_month = today.replace(day=1)
     next_month = (start_of_month + timedelta(days=32)).replace(day=1)
 
-    # --- Donaciones por día ---
     donations_daily = (
         db.session.query(
             func.date(Donation.timestamp).label('date'),
@@ -700,7 +696,6 @@ def dashboard_data():
     )
     donation_daily_dict = {str(row.date): float(row.total or 0) for row in donations_daily}
 
-    # --- Descargas por día ---
     downloads_daily = []
     try:
         downloads_daily = db.session.execute(text("""
@@ -714,14 +709,11 @@ def dashboard_data():
         print("⚠️ No se encontró columna timestamp en downloads:", e)
     downloads_daily_dict = {str(row.date): row.total for row in downloads_daily}
 
-    # --- Logins por día (vacío si no tienes tabla LoginLog) ---
     logins_daily_dict = {}
 
-    # --- Etiquetas del mes actual ---
     days_in_month = [(start_of_month + timedelta(days=i)).date() for i in range((next_month - start_of_month).days)]
     labels_daily = [str(day) for day in days_in_month]
 
-    # --- Preparar datos combinados ---
     activity_day = {
         'labels': labels_daily,
         'donations': [donation_daily_dict.get(str(day), 0) for day in days_in_month],
@@ -729,7 +721,6 @@ def dashboard_data():
         'logins': [logins_daily_dict.get(str(day), 0) for day in days_in_month],
     }
 
-    # --- Enviar datos a frontend ---
     return jsonify({
         'donations_month': {'labels': donations_month_labels, 'data': donations_month_data},
         'donations_week': {'labels': donations_week_labels, 'data': donations_week_data},
@@ -737,6 +728,9 @@ def dashboard_data():
         'downloads': {'labels': downloads_labels, 'data': downloads_data},
         'activity_day': activity_day
     })
+
+# ✅ REGISTRA EL BLUEPRINT AQUÍ (después de definir todas sus rutas)
+app.register_blueprint(admin_bp)
 
 def insert_data():
 # ... (Función insert_data completa) ...
@@ -941,6 +935,16 @@ def reset_password_code(token):
         return redirect(url_for('login'))
         
     return render_template('reset_password.html', token=token)
+
+@app.route('/game/<int:game_id>')
+def ver_juego(game_id):
+    # Buscar el juego en la base de datos
+    game = Game.query.get_or_404(game_id)
+
+    # (Opcional) Si tienes relación con comentarios, puedes traerlos así:
+    comentarios = Comment.query.filter_by(game_id=game_id).all()
+
+    return render_template('detalle_juego.html', game=game, comentarios=comentarios)
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=5000)

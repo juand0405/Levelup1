@@ -31,22 +31,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 3. Lógica para el botón "Descargar" (En homeUser.html)
+       // Lógica para el botón "Descargar"
     document.querySelectorAll('.download-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             const gameId = this.dataset.gameId;
             fetch(`/download_game/${gameId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Respuesta de red no satisfactoria');
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
                     alert(data.message);
                     if (data.success) {
-                        // Mejorado: Solo recargar si la descarga fue exitosa para actualizar la lista "Mis Juegos"
-                        // Nota: Si esto no es necesario, se puede quitar 'location.reload()'
+                        // Opcional: actualizar la interfaz de usuario sin recargar
                         location.reload(); 
                     }
                 })
@@ -56,19 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
         });
     });
-
-    // 4. Lógica para añadir comentarios
+  // Lógica para comentarios
     document.querySelectorAll('.comment-form').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             const gameId = this.querySelector('input[name="game_id"]').value;
-            const textarea = this.querySelector('textarea[name="content"]');
-            const content = textarea.value.trim();
-
-            if (!content) {
-                alert('El comentario no puede estar vacío.');
-                return;
-            }
+            const content = this.querySelector('textarea[name="content"]').value;
             
             fetch('/add_comment', {
                 method: 'POST',
@@ -80,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(response => response.json())
             .then(data => {
                 if(data.success) {
-                    textarea.value = ''; // Limpia el textarea
+                    this.querySelector('textarea[name="content"]').value = ''; // Limpia el textarea
                     loadComments(gameId); // Vuelve a cargar los comentarios para ver el nuevo
                 } else {
                     alert('Error al agregar comentario: ' + data.message);
@@ -89,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(error => console.error('Error:', error));
         });
     });
+
 
     // 5. Función para cargar y mostrar comentarios
     function loadComments(gameId) {
@@ -121,9 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 6. Cargar comentarios iniciales para todos los juegos
     document.querySelectorAll('.games-list .game-item').forEach(gameItem => {
-        const gameIdElement = gameItem.querySelector('.comment-form input[name="game_id"]');
-        if (gameIdElement) {
-            const gameId = gameIdElement.value;
+        const commentForm = gameItem.querySelector('.comment-form');
+        if (commentForm) { // Asegúrate de que haya una sección de comentarios
+            const gameId = commentForm.querySelector('input[name="game_id"]').value;
             loadComments(gameId);
         }
     });

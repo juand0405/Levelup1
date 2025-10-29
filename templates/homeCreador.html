@@ -42,104 +42,190 @@
             </div>
         </header>
 
+          
+
         <div id="inicio-view" class="main-view active-view">
-            <div class="main-view-content">
-                <h1 class="main-title">Panel de Creador</h1>
-                <p>Bienvenido, {{ user.username }}. Aquí puedes gestionar tus juegos y donaciones.</p>
-                <div class="card-grid">
-                    <div class="card-item">
-                        <i class="fas fa-upload"></i>
-                        <h4>Juegos Subidos</h4>
-                        <p>{{ creator_games|length }}</p>
-                    </div>
-                    <div class="card-item">
-                        <i class="fas fa-hand-holding-usd"></i>
-                        <h4>Donaciones Recibidas</h4>
-                        <p>{{ (user.received_donations|map(attribute='amount')|sum)|round(2) }}</p>
-                    </div>
+            <h1 class="main-title">Panel de Creador</h1>
+            <p>Bienvenido, {{ user.username }}. Aquí puedes gestionar tus juegos y donaciones.</p>
+            <div class="card-grid">
+                <div class="card-item">
+                    <i class="fas fa-upload"></i>
+                    <h4>Juegos Subidos</h4>
+                    <p>{{ creator_games|length }}</p>
+                </div>
+                <div class="card-item">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    <h4>Donaciones Recibidas</h4>
+                    <p>{{ (user.received_donations|map(attribute='amount')|sum)|round(2) }}</p>
                 </div>
             </div>
         </div>
         
         <div id="juegos-view" class="main-view hidden">
-            <div class="main-view-content">
-                <h1 class="main-title">Mis Juegos Subidos</h1>
-                <div class="games-list">
-                    {% if creator_games %}
-                        {% for game in creator_games %}
-                            <div class="game-item">
-                                <img src="{{ url_for('static', filename='uploads/' + game.image_url) }}" alt="Imagen del juego" class="game-image">
-                                <div class="game-info">
-                                    <h3>{{ game.name }}</h3>
-                                    <p>{{ game.description }}</p>
-                                </div>
+            <h1 class="main-title">Mis Juegos Subidos</h1>
+            <div class="games-list">
+                {% if creator_games %}
+                    {% for game in creator_games %}
+                        <div class="game-item">
+                            
+                            
+                            <img src="{{ url_for('static', filename=game.image_url) }}" alt="Imagen del juego" class="game-image">
+
+                            <div class="game-info">
+                                <h3>{{ game.name }}</h3>
+                                <p>{{ game.description }}</p>
                             </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No has subido ningún juego todavía.</p>
-                    {% endif %}
-                </div>
+                            
+
+                            <div class="game-actions">
+                                <a href="{{ url_for('static', filename=game.file_path) }}" class="btn btn-secondary" download>
+                                    <i class="fas fa-download"></i> Descargar Juego
+                                </a>
+
+                            <!-- Botón para eliminar juego -->
+                                <form action="{{ url_for('delete_game', game_id=game.id) }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('¿Seguro que deseas eliminar este juego?');">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+
+                        
+                    {% endfor %}
+                {% else %}
+                    <p>No has subido ningún juego todavía.</p>
+                {% endif %}
             </div>
         </div>
 
         <div id="donaciones-view" class="main-view hidden">
-            <div class="main-view-content">
-                <h1 class="main-title">Mis Donaciones Recibidas</h1>
-                <table class="donations-table">
-                    <thead>
-                        <tr>
-                            <th>Juego</th>
-                            <th>Monto</th>
-                            <th>Donador</th>
-                            <th>Fecha</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if received_donations %}
-                            {% for donation in received_donations %}
-                                <tr>
-                                    <td>
-                                        {% if donation.game %}
-                                            {{ donation.game.name }}
-                                        {% else %}
-                                            Donación directa
-                                        {% endif %}
-                                    </td>
-                                    <td>${{ donation.amount }}</td>
-                                    <td>{{ donation.donor.username }}</td>
-                                    <td>{{ donation.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
+            <h1 class="main-title">Mis Donaciones Recibidas</h1>
+            <table class="donations-table">
+                <thead>
+                    <tr>
+                        <th>Juego</th>
+                        <th>Monto</th>
+                        <th>Donador</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if received_donations %}
+                        {% for donation in received_donations %}
                             <tr>
-                                <td colspan="4">No has recibido donaciones.</td>
+                                <td>
+                                    {% if donation.game %}
+                                        {{ donation.game.name }}
+                                    {% else %}
+                                        Donación directa
+                                    {% endif %}
+                                </td>
+                                <td>${{ donation.amount }}</td>
+                                <td>{{ donation.donor.username }}</td>
+                                <td>{{ donation.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                             </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4">No has recibido donaciones.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
         </div>
 
+        <!--Subir juego-->
+       
+        <!--
         <div id="subir-view" class="main-view hidden">
-            <div class="main-view-content">
-                <h1 class="main-title">Sube tu Juego</h1>
-                <p>Comparte tu creación con la comunidad.</p>
-                <form method="POST" action="{{ url_for('upload_game') }}" enctype="multipart/form-data" class="upload-form">
-                    <div class="form-group">
-                        <label for="game-name">Nombre del Juego:</label>
-                        <input type="text" id="game-name" name="game-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="game-description">Descripción:</label>
-                        <textarea id="game-description" name="game-description" rows="4" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="game-image">Imagen del Juego:</label>
-                        <input type="file" id="game-image" name="game-image" accept="image/*" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Subir Juego</button>
-                </form>
-            </div>
+            <h1 class="main-title">Sube tu Juego</h1>
+            <p>Comparte tu creación con la comunidad.</p>
+
+            <form method="POST" action="{{ url_for('upload_game') }}" enctype="multipart/form-data" class="upload-form">
+                <div class="form-group">
+                    <label for="game-name">Nombre del Juego:</label>
+                    <input type="text" id="game-name" name="game-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-description">Descripción:</label>
+                    <textarea id="game-description" name="game-description" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-image">Imagen del Juego:</label>
+                    <input type="file" id="game-image" name="game-image" accept="image/*" required>
+                </div>
+
+    -->
+
+        <!-- 🆕 Campo para subir el archivo del juego -->
+
+        <!--
+                <div class="form-group">
+                    <label for="game-file">Archivo del Juego:</label>
+                    <input type="file" id="game-file" name="game-file"
+                           accept=".zip,.rar,.7z,.exe,.apk,.tar,.gz" required>
+                    <small class="form-text">
+                        (Formatos permitidos: .zip, .rar, .7z, .exe, .apk, .tar, .gz — hasta 2 GB)
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Subir Juego
+                </button>
+            </form>
+        </div>
+
+            -->
+        
+        <!--subir juego nuevo-->
+
+        <div id="subir-view" class="main-view hidden">
+            <h1 class="main-title">Sube tu Juego</h1>
+            <p>Comparte tu creación con la comunidad.</p>
+
+            <form method="POST" action="{{ url_for('upload_game') }}" enctype="multipart/form-data" class="upload-form">
+                <div class="form-group">
+                    <label for="game-name">Nombre del Juego:</label>
+                     <input type="text" id="game-name" name="game-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-description">Descripción:</label>
+                    <textarea id="game-description" name="game-description" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-genre">Género:</label>
+                    <input type="text" id="game-genre" name="game-genre" placeholder="Ejemplo: Acción, Aventura, RPG">
+                </div>
+
+                <div class="form-group">
+                    <label for="game-platform">Plataforma:</label>
+                    <input type="text" id="game-platform" name="game-platform" placeholder="Ejemplo: PC, Android, PS5">
+                </div>
+
+                <div class="form-group">
+                    <label for="game-image">Imagen del Juego:</label>
+                    <input type="file" id="game-image" name="game-image" accept="image/*" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="game-file">Archivo del Juego:</label>
+                    <input type="file" id="game-file" name="game-file"
+                           accept=".zip,.rar,.7z,.exe,.apk,.tar,.gz" required>
+                    <small class="form-text">
+                        (Formatos permitidos: .zip, .rar, .7z, .exe, .apk, .tar, .gz — hasta 2 GB)
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Subir Juego
+                </button>
+            </form>
         </div>
 
         <div id="notificaciones-view" class="main-view hidden">
@@ -154,6 +240,13 @@
                             {% if notif.image_url %}
                                 <img src="{{ url_for('static', filename='uploads/' + notif.image_url) }}" alt="{{ notif.title }}" style="max-width: 100%; height: auto; border-radius: 4px; margin-top: 10px;">
                             {% endif %}
+                             <!-- Botón de eliminar -->
+                <form action="{{ url_for('delete_notification', notif_id=notif.id) }}" method="POST" style="margin-top: 10px;">
+                    <button type="submit" style="background-color: #e74c3c; color: white; 
+                        border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+                        🗑️ Eliminar
+                    </button>
+                </form>
                         </div>
                     {% endfor %}
                 {% else %}

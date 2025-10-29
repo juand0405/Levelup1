@@ -4,85 +4,78 @@
 <div class="logout-link">
     <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a>
 </div>
-
-<div class="container mt-5">
-    <h1 class="main-title mb-4">Panel de Administración - Resumen de Datos</h1>
-
-    <div class="row">
-        <!-- DONACIONES POR MES -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="card-title">Donaciones Totales por Mes</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="donationsMonthChart"></canvas>
-                    </div>
+<div class="row">
+    <!-- DONACIONES POR MES -->
+    <div class="col-md-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title">Donaciones Totales por Mes</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="donationsMonthChart"></canvas>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- USUARIOS POR ROL -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="card-title">Conteo de Usuarios Registrados por Rol</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="loginsChart"></canvas>
-                    </div>
+    <!-- USUARIOS POR ROL -->
+    <div class="col-md-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title">Conteo de Usuarios Registrados por Rol</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="loginsChart"></canvas>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- DONACIONES POR SEMANA -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="card-title">Donaciones Totales por Semana</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="donationsWeekChart"></canvas> 
-                    </div>
+    <!-- DONACIONES POR SEMANA -->
+    <div class="col-md-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title">Donaciones Totales por Semana</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="donationsWeekChart"></canvas> 
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- TOP 10 DESCARGAS -->
-        <div class="col-md-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="card-title">Top 10 Juegos más Descargados</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="downloadsChart"></canvas>
-                    </div>
+    <!-- TOP 10 DESCARGAS -->
+    <div class="col-md-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title">Top 10 Juegos más Descargados</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="downloadsChart"></canvas>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- 🔥 NUEVA GRÁFICA: ACTIVIDAD DIARIA DEL MES -->
-        <div class="col-md-12 mb-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <h5 class="card-title">Actividad Diaria del Mes (Inicios, Descargas y Donaciones)</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-container" style="height: 400px;">
-                        <canvas id="activityDayChart"></canvas>
-                    </div>
+    <!-- 🔥 NUEVA GRÁFICA: ACTIVIDAD DIARIA DEL MES -->
+    <div class="col-md-12 mb-4">
+        <div class="card shadow">
+            <div class="card-header">
+                <h5 class="card-title">Actividad Diaria del Mes (Inicios, Descargas y Donaciones)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="activityDayChart"></canvas>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>

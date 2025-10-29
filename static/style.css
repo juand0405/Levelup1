@@ -269,37 +269,114 @@ a:hover {
     from {opacity: 0; transform: translateY(-20px);}
     to {opacity: 1; transform: translateY(0);}
 }
- /* Estilos opcionales para que las tarjetas se vean bien */
-    .card {
-        background-color: #1a1a2e; /* Fondo oscuro de la tarjeta */
-        color: #fff;
-        border: 1px solid #00c6ff;
-        border-radius: 10px;
-    }
-    .card-header {
-        border-bottom: 1px solid #00c6ff;
-    }
-    .main-title {
-        color: #00c6ff;
-    }
-    .chart-container {
-        height: 300px; /* Altura fija para ver bien la gráfica */
-    }
-  /* Añade esta regla al final de tu archivo static/style.css */
 
-.main-view-content {
-    /* Define el ancho máximo (ej: 900px), ajusta este valor si el de usuario tiene otro. */
-    max-width: 900px; 
-    
-    /* Centra el bloque de contenido horizontalmente. */
-    margin: 0 auto; 
-    
-    /* Asegura que el contenido respete el margen de los lados. */
-    padding: 0 15px; 
+/* Rejilla de juegos */
+.games-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* varias columnas adaptables */
+    gap: 25px; /* separación entre tarjetas */
+    padding: 20px;
+    justify-items: center; /* centra las tarjetas */
 }
 
-/* Opcional: Asegúrate de que las tablas y formularios ocupen el ancho total de ese nuevo contenedor. */
-.donations-table, .upload-form {
-    width: 100%; 
-    box-sizing: border-box; 
+/* Cada juego */
+.game-item {
+    width: 100%;
+    max-width: 300px;   /* 🔹 limita el ancho de cada tarjeta */
+    background: #0a0a0a;
+    color: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.game-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.4);
+}
+
+/* Imagen del juego */
+.game-image {
+    width: 100%;
+    height: 160px;       /* 🔹 controla la altura (ajústalo si quieres más pequeña) */
+    object-fit: cover;   /* recorta sin deformar */
+    border-bottom: 2px solid #0ff;
+}
+
+/* Información del juego */
+.game-info {
+    padding: 10px;
+    text-align: center;
+}
+
+/* Títulos y descripción */
+.game-info h3 {
+    margin: 10px 0 5px;
+    font-size: 1.2em;
+    color: #0ff;
+}
+.game-info p {
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+/* Botones */
+.game-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+/* --- Ajustes visuales suaves para el login --- */
+.main-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh; /* centra verticalmente sin cubrir el footer */
+    background: transparent; /* mantiene tu fondo original */
+}
+
+.form-container {
+    max-width: 400px;
+    width: 100%;
+    padding: 2rem;
+    background-color: rgba(255, 255, 255, 0.05); /* leve transparencia para destacar el bloque */
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.login-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.login-form input {
+    width: 100%;
+    padding: 0.7rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    outline: none;
+    font-size: 1rem;
+}
+
+.login-form input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 4px rgba(0, 123, 255, 0.5);
+}
+
+.text-center {
+    text-align: center;
+    margin-top: 1rem;
+}
+/* Corrige centrado de texto y separación */
+.form-container h2,
+.form-container form,
+.form-container .text-center {
+    text-align: center;
+}
+
+.form-container form input,
+.form-container form button {
+    display: block;
+    margin: 0.5rem auto;
 }
