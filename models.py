@@ -42,12 +42,21 @@ class User(db.Model, UserMixin):
 
 class Game(db.Model):
     __tablename__ = 'game'
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.String(255), nullable=True)
+    file_path = db.Column(db.String(200))  # Agregamos este campo
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
+    # 🔹 Nuevos campos opcionales (especificaciones del juego)
+    genre = db.Column(db.String(100), nullable=True)          # Ejemplo: "Acción", "Aventura", "RPG"
+    platform = db.Column(db.String(100), nullable=True)       # Ejemplo: "PC", "PlayStation", "Xbox"
+    size = db.Column(db.String(50), nullable=True)            # Ejemplo: "2.5 GB"
+    developer = db.Column(db.String(100), nullable=True)      # Ejemplo: "Nintendo", "Ubisoft"
+    release_date = db.Column(db.String(50), nullable=True)    # Ejemplo: "2024-11-12"
+
     # Relaciones
     donations = db.relationship('Donation', backref='game', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='game', lazy=True, cascade='all, delete-orphan')

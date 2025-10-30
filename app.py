@@ -5,7 +5,6 @@ from config import WOMPI_PUBLIC_KEY, WOMPI_INTEGRITY_KEY, WOMPI_REDIRECT_URL, WO
 import os
 from datetime import datetime, timedelta
 from flask_migrate import Migrate
-from datetime import datetime
 from config import Config
 from models import db, User, Game, Comment, Donation, PasswordResetToken, Notification, downloads
 from flask_mail import Mail, Message
@@ -65,7 +64,7 @@ def send_notification_email(subject, recipients, html_body):
         return False
 
 # ... (código existente) ...
-def create_default_admin():
+##def create_default_admin():
     """Función para crear un usuario administrador por defecto si no existe."""
     with app.app_context():
         admin_user = User.query.filter_by(documento='123456789').first()
@@ -79,11 +78,10 @@ def create_default_admin():
 # Reemplazamos @app.before_first_request con with app.app_context()
 with app.app_context():
     db.create_all()
-    create_default_admin()
+   ## create_default_admin()
 # --- FIN DEL CAMBIO ---
 
 @app.route('/')
-
 def home():
 # ... (Función home completa) ...
     if 'user_id' in session:
@@ -792,33 +790,42 @@ def insert_data():
 @app.route('/upload_game', methods=['GET', 'POST'])
 def upload_game():
 # ... (Función upload_game completa) ...
-    if 'user_id' not in session:
-        flash('Debes iniciar sesión para subir un juego.', 'error')
-        return redirect(url_for('login'))
-        
-    if request.method == 'POST':
+   if request.method == 'POST':
         game_name = request.form['game-name']
         game_description = request.form['game-description']
         
+        # Manejo de imagen
+        image_filename = None
         if 'game-image' in request.files:
-            file = request.files['game-image']
-            if file and file.filename != '':
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                
-                new_game = Game(
-                    name=game_name,
-                    description=game_description,
-                    image_url=filename,
-                    creator_id=session['user_id']
-                )
-                
-                db.session.add(new_game)
-                db.session.commit()
-                flash('Juego subido exitosamente.', 'success')
-                return redirect(url_for('home_creador'))
-            
-    return render_template('formu.html')
+            image = request.files['game-image']
+            if image.filename != '':
+                image_filename = secure_filename(f"{uuid.uuid4().hex}_{image.filename}")
+                image.save(os.path.join(app.config['UPLOAD_FOLDER'], image_filename))
+        
+        # Manejo del archivo del juego
+        game_file_path = None
+        if 'game-file' in request.files:
+            game_file = request.files['game-file']
+            if game_file.filename != '':
+                game_filename = secure_filename(f"{uuid.uuid4().hex}_{game_file.filename}")
+                game_file.save(os.path.join(app.config['UPLOAD_FOLDER'], game_filename))
+                game_file_path = game_filename
+
+        new_game = Game(
+            name=game_name,
+            description=game_description,
+            image_url=image_filename,
+            file_path=game_file_path,
+            creator_id=current_user.id
+        )
+        
+        db.session.add(new_game)
+        db.session.commit()
+        
+        flash('Juego subido exitosamente.', 'success')
+        return redirect(url_for('home_creador'))
+        
+        return render_template('formu.html')
 
 @app.route('/edit_profile', methods=['GET', 'POST'])
 def edit_profile():
